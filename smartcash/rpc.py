@@ -138,30 +138,32 @@ class SmartCashRPC(object):
 
         return result
 
+    def raw(self, method, args):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request(method, args)
+        except RPCException as e:
+            response.error = e.error
+            logging.debug(method, exc_info=e)
+
+        return response
+
+
     def validateAddress(self, address):
 
         cleanAddress = re.sub('[^A-Za-z0-9]+', '', address)
 
+        response = RPCResponse()
+
         try:
-
-            cliResult = subprocess.check_output(['smartcash-cli', 'validateaddress',cleanAddress])
-            output = cliResult.decode('utf-8')
-
+            response.data = self.request('validateaddress', [address])
         except RPCException as e:
             response.error = e.error
-            logging.error('validateAddress', exc_info=e)
-        else:
+            logging.debug('validateaddress', exc_info=e)
 
-            validate = self.parseResponse(output)
-
-            if not validate:
-                logging.error("validateAddress no valid response")
-                return False
-
-            if "isvalid" in validate and validate["isvalid"] == True:
-                return True
-
-        return False
+        return response
 
     def getInfo(self):
 
