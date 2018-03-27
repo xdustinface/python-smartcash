@@ -2,11 +2,11 @@
 Some python stuff for SmartCash projects.
 
 ## Take care..
-Just started with this..there is a lot to improve and will continue with it as i have time too. If you have any **questions** or you want to **contribute** just ping me in the SmartCash discord **@dustinface#6318** or in to telegram **@dustinface**
+Just started with this..there is a lot to improve and will continue with it as i have time too. If you have any **questions** or you want to **contribute** just ping me in the SmartCash discord **@dustinface#6318** or in telegram **@dustinface**
 
 ## Use it
 
-Just run `sudo setup.py install` and check out the examples in the `test` folder.
+Just run `python setup.py install` and check out the examples in the `test` folder.
 
 # Beer, coffee and further development
 If you enjoy it and you are feeling the urge to tip me...go ahead :D

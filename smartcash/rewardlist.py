@@ -30,7 +30,7 @@ import logging
 from smartcash.util import ThreadedSQLite
 from smartcash.rpc import SmartCashRPC, RPCConfig
 
-logger = logging.getLogger("_rewards_")
+logger = logging.getLogger("smartcash.rewardlist")
 
 class SNReward(object):
 
@@ -73,8 +73,9 @@ class SNRewardList(object):
             currentBlock = self.rpc.getBlockByNumber(currentHeight)
 
             if not currentBlock.data:
-                logger.error("Could not fetch block {}".format(block.error))
-                return
+                logger.error("Could not fetch block {}".format(currentBlock.error))
+                time.sleep(30)
+                continue
 
             if currentBlock.data['confirmations'] < 3:
                 logger.info("[{}] Wait for confirmations ({}): {}".format(currentHeight, currentBlock.data['confirmations'], currentBlock.data['hash']))

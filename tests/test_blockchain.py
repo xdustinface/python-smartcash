@@ -39,9 +39,14 @@ if __name__ == '__main__':
     #chain = SmartCashBlockchain('sqlite:////' + directory + '/tt.db', rpcConfig)
 
     # Test MYSQL - You need to create the database before!
-    chain = SmartCashBlockchain('mysql+mysqlconnector://root:smartcash@localhost/smartcash', rpcConfig)
+    chain = SmartCashBlockchain('mysql+mysqlconnector://root:smartcash@localhost/smartcash')
+
+    chain.run()
+
+    while True:
+        address = input("Address: ")
+        print("Outputs: {}".format(chain.getNumerOfOutputs(address)))
+        print("Balance {}".format(chain.getBalance(address)))
 
     # Test POSTGRESS
     #chain = SmartCashBlockchain('sqlite:////' + directory + '/tt.db', rpcConfig)
-
-    chain.run()

@@ -28,10 +28,17 @@ import logging
 import re
 import copy
 import base64
-import http.client as http
-from urllib.parse import urlparse
+try:
+    import http.client as http
+except ImportError:
+    import httplib as http
 
-logger = logging.getLogger("smartcash-rpc")
+try:
+    import urllib.parse as urlparse
+except ImportError:
+    import urlparse
+
+logger = logging.getLogger("smartcash.rpc")
 
 class RPCException(Exception):
     def __init__(self, code = None, message = None):
@@ -39,12 +46,15 @@ class RPCException(Exception):
         self.error = RPCError(code,message)
 
     def __str__(self):
-        return '{} => {}'.format(self.error.code, self.error.message)
+        return str(self.error)
 
 class RPCError(object):
     def __init__(self, code = None, message = None):
         self.code = code if code else "?"
         self.message = message if message else "?"
+
+    def __str__(self):
+        return '{} => {}'.format(self.code, self.message)
 
 class RPCResponse(object):
     def __init__(self, data = None, error = None):
@@ -56,7 +66,7 @@ class RPCConfig(object):
 
         self.port = port
 
-        self.url = urlparse(url)
+        self.url = urlparse.urlparse(url)
 
         try:
             self.user = user.encode('utf8')
@@ -255,5 +265,91 @@ class SmartCashRPC(object):
         except RPCException as e:
             response.error = e.error
             logging.debug('snsync', exc_info=e)
+
+        return response
+
+    def unlockWallet(self, password, timeout = 200):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('walletpassphrase', [password, timeout ])
+        except RPCException as e:
+
+            # Missing RPC result is expected when unlocking
+            if e.error.code != 14:
+                response.error = e.error
+                logging.debug('walletpassphrase', exc_info=e)
+            else:
+                response.error = None
+                response.data = True
+
+        return response
+
+    def lockWallet(self):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('walletlock')
+        except RPCException as e:
+
+            # Missing RPC result is expected when locking
+            if e.error.code != 14:
+                response.error = e.error
+                logging.debug('walletlock', exc_info=e)
+            else:
+                response.error = None
+                response.data = True
+
+        return response
+
+    def getAccounts(self):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('listaccounts')
+        except RPCException as e:
+            response.error = e.error
+            logging.debug('listaccounts', exc_info=e)
+
+        return response
+
+    def getAddressGroupings(self):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('listaddressgroupings')
+        except RPCException as e:
+            response.error = e.error
+            logging.debug('listaddressgroupings', exc_info=e)
+
+        return response
+
+
+    def signMessage(self, address, message):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('signmessage', [address, message])
+        except RPCException as e:
+            response.error = e.error
+            logging.debug('signmessage', exc_info=e)
+
+        return response
+
+
+    def verifyMessage(self, address, message, signature):
+
+        response = RPCResponse()
+
+        try:
+            response.data = self.request('verifymessage', [address, signature, message])
+        except RPCException as e:
+            response.error = e.error
+            logging.debug('verifymessage', exc_info=e)
 
         return response

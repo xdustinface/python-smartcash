@@ -23,8 +23,16 @@
 # THE SOFTWARE.
 
 from setuptools import setup
+from codecs import open
+from os import path
 
-__version__ = '0.1'
+__version__ = '0.0.1'
+
+here = path.abspath(path.dirname(__file__))
+
+# Get the long description from the README file
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='python-smartcash',
@@ -37,7 +45,16 @@ setup(
     maintainer_email='<xdustinfacex@gmail.com>',
     url='https://github.com/xdustinface/python-smartcash',
     packages=['smartcash'],
+    install_requires=['sqlalchemy==1.2.5', 'requests==2.18.4'],
     classifiers=[
-        'License :: OSI Approved :: MIT', 'Operating System :: OS Independent'
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development :: Tools',
+        'License :: OSI Approved :: MIT', 'Operating System :: OS Independent',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ]
 )
