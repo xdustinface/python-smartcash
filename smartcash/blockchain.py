@@ -34,8 +34,6 @@ import threading
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import Table, Column, Integer, Float, String, MetaData, ForeignKey
 from sqlalchemy import *
 
 from smartcash.rpc import SmartCashRPC

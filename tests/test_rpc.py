@@ -44,21 +44,22 @@ def test(success, msg, *margs):
 
 if __name__ == '__main__':
 
-    config = RPCConfig('smart','cash')
+    config = RPCConfig('someusername','somepassword')
 
     rpc = SmartCashRPC(config)
 
     sync = rpc.getSyncStatus()
 
     test(sync.data, "get sync state")
-    test(sync.data['IsBlockchainSynced'], "blockchain synced")
-    test(sync.data['IsMasternodeListSynced'], "nodelist synced")
-    test(sync.data['IsWinnersListSynced'], "winnerslist synced")
+    test(not sync.error, "get sync error")
+    test(sync['IsBlockchainSynced'], "blockchain synced")
+    test(sync['IsMasternodeListSynced'], "nodelist synced")
+    test(sync['IsWinnersListSynced'], "winnerslist synced")
 
     info = rpc.getInfo()
     test(info.data, "get info")
 
-    test('blocks' in info.data, "get current block => {}".format(info.data['blocks'] if 'blocks' in info.data else None))
+    test('blocks' in info, "get current block => {}".format(info['blocks'] if 'blocks' in info else None))
 
     blockInvalid = rpc.getBlockByHash("0000000000INVALIDINVALIDINVALIDINVALIDINVALIDINVALIDINVALIDINVALID")
     test(blockInvalid.data == None, "get block with invalid hash")
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     nodelist = rpc.getSmartNodeList('full')
 
     test(nodelist.data != None, "get nodelist full")
-    test(len(nodelist.data), "nodes available {}", len(nodelist.data))
+    test(len(nodelist), "nodes available {}", len(nodelist.data))
 
     lastBlock = 0
     testedBlocks = 0

@@ -26,7 +26,7 @@ from setuptools import setup
 from codecs import open
 from os import path
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 here = path.abspath(path.dirname(__file__))
 
@@ -46,6 +46,7 @@ setup(
     url='https://github.com/xdustinface/python-smartcash',
     packages=['smartcash'],
     install_requires=['sqlalchemy==1.2.5', 'requests==2.18.4'],
+    zip_safe=False,
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

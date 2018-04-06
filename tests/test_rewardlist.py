@@ -23,22 +23,54 @@
 # THE SOFTWARE.
 #####
 
-import os, logging
+import os, logging, time
 from smartcash.rpc import RPCConfig
-from smartcash.rewardlist import SNRewardList
+from smartcash.rewardlist import SNRewardList, SNReward
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+if not input:
+    input=raw_input
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger("rewardtest")
 
-def rewardCB(reward):
+def rewardCB(reward, isSynced):
     logger.info("rewardCB: {}".format(str(reward)))
 
 if __name__ == '__main__':
 
+    test = 1
+
     directory = os.path.dirname(os.path.realpath(__file__))
 
-    rpcConfig = RPCConfig('smart','cash')
+    rpcConfig = RPCConfig('someusername','somepassword')
 
-    rewardList = SNRewardList(directory + "/rewards.db", rpcConfig, rewardCB)
+    rewardList = SNRewardList('sqlite:////' + directory + '/tt.db', rpcConfig, rewardCB)
 
-    rewardList.run()
+    rewardList.start()
+
+    while test == 1:
+
+        if rewardList.isSynced():
+
+            address = raw_input("Address to lookup: ")
+
+            rewards = rewardList.getRewardsForPayee(address)
+
+            if rewards:
+                print("Rewards: {}".format(rewards))
+                print("Profit: {}".format(sum(map(lambda x: x.amount,rewards))))
+            else:
+                print("{} did't receive any rewards yet.".format(address))
+        else:
+            print("Syncing... {}/{}".format(rewardList.currentHeight, rewardList.chainHeight))
+            time.sleep(2)
+
+    if test == 2:
+
+        reward = SNReward(block=201,
+                          txtime=123,
+                          payee="test",
+                          source=1,
+                          meta=0)
+
+        rewardList.updateSource(reward)

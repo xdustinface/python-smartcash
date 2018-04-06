@@ -61,6 +61,12 @@ class RPCResponse(object):
         self.data = data
         self.error = error
 
+    def __contains__(self, key):
+        return False if not self.data else key in self.data
+
+    def __getitem__(self, key):
+        return self.data[key]
+
 class RPCConfig(object):
     def __init__(self, user, password, url = "http://127.0.0.1", port = 9679, timeout = 20):
 
