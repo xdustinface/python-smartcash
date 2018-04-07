@@ -205,7 +205,7 @@ class SNRewardList(Thread):
 
                 for out in rawTx['vout']:
 
-                    amount = int(out['value'])
+                    amount = float(out['value'])
 
                     if amount <= expectedUpper and amount >= expectedLower:
                        #We found the node payout for this block!
