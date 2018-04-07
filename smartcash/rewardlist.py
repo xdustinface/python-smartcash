@@ -48,7 +48,7 @@ class SNReward(object):
 
         if not hasattr(self, 'amount'):
             if self.block:
-                self.amount = 5000.0  * ( 143500.0 / int(self.block) ) * 0.1
+                self.amount = round(5000.0  * ( 143500.0 / int(self.block) ) * 0.1, 1)
             else:
                 self.amount = 0
 
