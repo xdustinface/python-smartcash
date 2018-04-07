@@ -99,6 +99,12 @@ class SNRewardList(Thread):
         self.lookups = []
         self.sourceUpdates = []
 
+    def start(self):
+
+        if not self.is_alive():
+            logger.info("Starting!")
+            Thread.start(self)
+
     def run(self):
 
         self.lock.acquire()
