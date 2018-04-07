@@ -265,7 +265,9 @@ class SNRewardList(Thread):
 
         if not updated:
             updated = self.addReward(reward)
-            logger.warning("updateSource not found, add {}".format(updated))
+            logger.info("updateSource not found, add {}".format(updated))
+        else:
+            logger.info("updateSource updated - {}".format(str(reward)))
 
         return updated
 
@@ -283,7 +285,9 @@ class SNRewardList(Thread):
 
         if not updated:
             updated = self.addReward(reward)
-            logger.warning("updateMeta not found, add {}".format(updated))
+            logger.info("updateMeta not found, add {}".format(updated))
+        else:
+            logger.info("updateMeta updated - {}".format(str(reward)))
 
         return updated
 

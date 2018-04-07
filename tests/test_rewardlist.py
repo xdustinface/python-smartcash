@@ -38,13 +38,13 @@ def rewardCB(reward, isSynced):
 
 if __name__ == '__main__':
 
-    test = 1
+    test = 2
 
     directory = os.path.dirname(os.path.realpath(__file__))
 
     rpcConfig = RPCConfig('someusername','somepassword')
 
-    rewardList = SNRewardList('sqlite:////' + directory + '/tt.db', rpcConfig, rewardCB)
+    rewardList = SNRewardList('sqlite:////' + directory + '/rewards.db', rpcConfig, rewardCB)
 
     rewardList.start()
 
@@ -67,10 +67,15 @@ if __name__ == '__main__':
 
     if test == 2:
 
-        reward = SNReward(block=201,
-                          txtime=123,
+        reward = SNReward(block=403051,
+                          txtime=1111,
                           payee="test",
                           source=1,
-                          meta=0)
+                          meta=2)
 
-        rewardList.updateSource(reward)
+        print("Update {}".format(rewardList.updateSource(reward)))
+
+        reward.source=0
+        reward.meta=0
+
+        print("Add {}".format(rewardList.addReward(reward)))
