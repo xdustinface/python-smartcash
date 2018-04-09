@@ -334,6 +334,14 @@ class SNRewardList(Thread):
 
         return rewards
 
+    def getRewardForBlock(self, block):
+
+        query = select([self.rewards]).where(self.rewards.c.block == block)
+
+        rewards = self.execute(query).fetchall()
+
+        return rewards
+
     def getRewards(self, payee, start = None):
 
         query = select([self.rewards]).where(self.rewards.c.payee == payee)
