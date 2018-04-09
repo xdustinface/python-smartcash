@@ -67,15 +67,19 @@ if __name__ == '__main__':
 
     if test == 2:
 
-        reward = SNReward(block=403051,
-                          txtime=1111,
-                          payee="test",
-                          source=1,
-                          meta=2)
-
-        print("Update {}".format(rewardList.updateSource(reward)))
-
-        reward.source=0
-        reward.meta=0
-
-        print("Add {}".format(rewardList.addReward(reward)))
+        # reward = SNReward(block=403051,
+        #                   txtime=1111,
+        #                   payee="test",
+        #                   source=1,
+        #                   meta=2)
+        #
+        # print("Update {}".format(rewardList.updateSource(reward)))
+        #
+        # reward.source=0
+        # reward.meta=0
+        #
+        # print("Add {}".format(rewardList.addReward(reward)))
+        fromTime = 1520598868
+        print("All: {}".format(rewardList.countRewards(0)))
+        print("All from {} : {}".format(fromTime, rewardList.countRewards(start=fromTime)))
+        print("In list from {} : {}".format(fromTime, rewardList.countRewards(start=fromTime, source=1)))

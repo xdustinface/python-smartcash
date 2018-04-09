@@ -73,6 +73,7 @@ class SNRewardList(Thread):
 
         Thread.__init__(self)
 
+        self.running = True
         self.daemon = True
 
         self.rewardCB = rewardCB
@@ -96,14 +97,14 @@ class SNRewardList(Thread):
             Column('meta', Integer),
         )
 
-        self.lookups = []
-        self.sourceUpdates = []
-
     def start(self):
 
         if not self.is_alive():
             logger.info("Starting!")
             Thread.start(self)
+
+    def stop(self):
+        self.running = False
 
     def run(self):
 
@@ -129,8 +130,8 @@ class SNRewardList(Thread):
 
         lastInfoCheck = 0
 
-        while True:
-
+        while self.running:
+            
             if not lastInfoCheck or (time.time() - lastInfoCheck) > 50:
 
                 info = self.rpc.getInfo()
@@ -195,6 +196,7 @@ class SNRewardList(Thread):
 
         # Search the new coin transaction of the block
         for tx in block['tx']:
+
             rawTx = self.rpc.getRawTransaction(tx)
 
             if rawTx.error:
@@ -222,11 +224,17 @@ class SNRewardList(Thread):
 
         return None
 
-    def addReward(self, reward):
-
-        error = True
+    def execute(self, query):
 
         self.lock.acquire()
+
+        result = self.conn.execute(query)
+
+        self.lock.release()
+
+        return result
+
+    def addReward(self, reward):
 
         try:
 
@@ -238,36 +246,27 @@ class SNRewardList(Thread):
                                    source=reward.source,
                                    meta=reward.meta)
 
-            error = not self.conn.execute(newReward)
+            if self.execute(newReward):
+                return True
 
         except Exception as e:
             logger.debug("addReward", exc_info=e)
 
-        self.lock.release()
-
-        return not error
+        return False
 
     def getLastReward(self):
 
-        self.lock.acquire()
-
-        lastReward = self.conn.execute(select([func.max(self.rewards.c.block)])).scalar()
-
-        self.lock.release()
+        lastReward = self.execute(select([func.max(self.rewards.c.block)])).scalar()
 
         return lastReward if lastReward else None
 
     def updateSource(self, reward):
 
-        self.lock.acquire()
-
         query = self.rewards.update().\
                     values(source=reward.source).\
                     where(self.rewards.c.block == reward.block)
 
-        updated = self.conn.execute(query).rowcount
-
-        self.lock.release()
+        updated = self.execute(query).rowcount
 
         if not updated:
             updated = self.addReward(reward)
@@ -279,15 +278,11 @@ class SNRewardList(Thread):
 
     def updateMeta(self, reward):
 
-        self.lock.acquire()
-
         query = self.rewards.update().\
                     values(meta=reward.meta).\
                     where(self.rewards.c.block == reward.block)
 
-        updated = self.conn.execute(query).rowcount
-
-        self.lock.release()
+        updated = self.execute(query).rowcount
 
         if not updated:
             updated = self.addReward(reward)
@@ -297,13 +292,41 @@ class SNRewardList(Thread):
 
         return updated
 
-    def getRewardsForPayee(self, payee):
-
-        self.lock.acquire()
+    def getRewardsForPayee(self, payee, fromTime = None):
 
         query = select([self.rewards]).where(self.rewards.c.payee == payee)
-        rewards = self.conn.execute(query).fetchall()
 
-        self.lock.release()
+        if fromTime:
+            query = query.where(self.rewards.c.txtime >= fromTime)
+
+        rewards = self.execute(query).fetchall()
+
+        return rewards
+
+    def countRewards(self, start = None, meta = None, source = None):
+
+        query = select([func.count(self.rewards.c.block)])
+
+        if start:
+            query = query.where(self.rewards.c.txtime >= start)
+
+        if source:
+            query = query.where(self.rewards.c.source == source)
+
+        if meta:
+            query = query.where(self.rewards.c.meta == meta)
+
+        rewards = self.execute(query).scalar()
+
+        return rewards
+
+    def getRewards(self, payee, start = None):
+
+        query = select([self.rewards]).where(self.rewards.c.payee == payee)
+
+        if start:
+            query = query.where(self.rewards.c.txtime >= start)
+
+        rewards = self.execute(query).fetchall()
 
         return rewards
