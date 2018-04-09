@@ -338,7 +338,7 @@ class SNRewardList(Thread):
 
         query = select([self.rewards]).where(self.rewards.c.block == block)
 
-        rewards = self.execute(query).fetchall()
+        rewards = self.execute(query).fetchone()
 
         return rewards
 
