@@ -73,9 +73,10 @@ class SNRewardList(Thread):
 
         Thread.__init__(self)
 
-        self.running = True
+        self.running = False
         self.daemon = True
 
+        self.conn = None
         self.rewardCB = rewardCB
         self.rpc = SmartCashRPC(rpcConfig)
         self.sessionPath = sessionPath
@@ -124,14 +125,16 @@ class SNRewardList(Thread):
         lastReward = self.getLastReward()
 
         if lastReward:
-            self.currentHeight = int(lastReward) + 1
+            self.currentHeight = int(lastReward.block) + 1
 
         logger.info("Start block {}".format(self.currentHeight))
 
         lastInfoCheck = 0
 
+        self.running = True
+
         while self.running:
-            
+
             if not lastInfoCheck or (time.time() - lastInfoCheck) > 50:
 
                 info = self.rpc.getInfo()
@@ -254,9 +257,19 @@ class SNRewardList(Thread):
 
         return False
 
+    def getNextReward(self, fromTime=None):
+
+        query = select([self.rewards]).where(self.rewards.c.txtime >= fromTime).limit(1)
+
+        nextReward = self.execute(query).fetchone()
+
+        return nextReward if nextReward else None
+
     def getLastReward(self):
 
-        lastReward = self.execute(select([func.max(self.rewards.c.block)])).scalar()
+        query = select([self.rewards]).order_by(self.rewards.c.block.desc()).limit(1)
+
+        lastReward = self.execute(query).fetchone()
 
         return lastReward if lastReward else None
 
@@ -303,7 +316,7 @@ class SNRewardList(Thread):
 
         return rewards
 
-    def countRewards(self, start = None, meta = None, source = None):
+    def getRewardCount(self, start = None, meta = None, source = None):
 
         query = select([func.count(self.rewards.c.block)])
 
