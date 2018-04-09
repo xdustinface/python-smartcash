@@ -320,13 +320,13 @@ class SNRewardList(Thread):
 
         query = select([func.count(self.rewards.c.block)])
 
-        if start:
+        if start != None:
             query = query.where(self.rewards.c.txtime >= start)
 
-        if source:
+        if source != None:
             query = query.where(self.rewards.c.source == source)
 
-        if meta:
+        if meta != None:
             query = query.where(self.rewards.c.meta == meta)
 
         rewards = self.execute(query).scalar()
