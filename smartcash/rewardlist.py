@@ -254,6 +254,7 @@ class SNRewardList(Thread):
 
         except Exception as e:
             logger.debug("addReward", exc_info=e)
+            self.lock.release()
 
         return False
 
