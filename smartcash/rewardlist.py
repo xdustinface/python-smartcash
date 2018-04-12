@@ -292,7 +292,7 @@ class SNRewardList(Thread):
 
             newReward = self.rewards.insert()\
                            .values(block=reward.block,
-                                   txtime=reward.txtime,
+                                   txtime=int(reward.txtime),
                                    payee=reward.payee,
                                    amount=reward.amount,
                                    source=reward.source,
@@ -318,7 +318,7 @@ class SNRewardList(Thread):
 
     def getNextReward(self, fromTime=None):
 
-        query = select([self.rewards]).where(self.rewards.c.txtime >= fromTime).limit(1)
+        query = select([self.rewards]).where(self.rewards.c.txtime >= int(fromTime)).limit(1)
 
         nextReward = self.execute(query).fetchone()
 
@@ -369,7 +369,7 @@ class SNRewardList(Thread):
         query = select([self.rewards]).where(self.rewards.c.payee == payee)
 
         if fromTime:
-            query = query.where(self.rewards.c.txtime >= fromTime)
+            query = query.where(self.rewards.c.txtime >= int(fromTime))
 
         rewards = self.execute(query).fetchall()
 
@@ -380,7 +380,7 @@ class SNRewardList(Thread):
         query = select([func.count(self.rewards.c.block)])
 
         if start != None:
-            query = query.where(self.rewards.c.txtime >= start)
+            query = query.where(self.rewards.c.txtime >= int(start))
 
         if source != None:
             query = query.where(self.rewards.c.source == source)
@@ -405,7 +405,7 @@ class SNRewardList(Thread):
         query = select([self.rewards]).where(self.rewards.c.payee == payee)
 
         if start:
-            query = query.where(self.rewards.c.txtime >= start)
+            query = query.where(self.rewards.c.txtime >= int(start))
 
         rewards = self.execute(query).fetchall()
 
