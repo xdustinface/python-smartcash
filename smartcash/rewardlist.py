@@ -34,10 +34,19 @@ from sqlalchemy import *
 
 logger = logging.getLogger("smartcash.rewardlist")
 
+class SNRewardError(object):
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+    def __str__(self):
+        return "{} - {}".format(self.code, self.message)
+
+
 class SNReward(object):
 
     def __init__(self, **kwargs):
-        attributes = ['block', 'txtime', 'payee', 'amount', 'source', 'meta']
+        attributes = ['block', 'txtime', 'payee', 'amount', 'source', 'meta', 'verified']
 
         for attribute in attributes:
             if attribute in kwargs:
@@ -58,6 +67,9 @@ class SNReward(object):
         if not hasattr(self, 'meta'):
             self.meta = 0
 
+        if not hasattr(self, 'verified'):
+            self.verified = 0
+
     def __str__(self):
         return '[{0.payee}] {0.block} - {0.amount}'.format(self)
 
@@ -69,7 +81,7 @@ class SNReward(object):
 
 class SNRewardList(Thread):
 
-    def __init__(self, sessionPath, rpcConfig, rewardCB = None):
+    def __init__(self, sessionPath, rpcConfig, rewardCB = None, errorCB = None):
 
         Thread.__init__(self)
 
@@ -78,6 +90,7 @@ class SNRewardList(Thread):
 
         self.conn = None
         self.rewardCB = rewardCB
+        self.errorCB = errorCB
         self.rpc = SmartCashRPC(rpcConfig)
         self.sessionPath = sessionPath
 
@@ -96,6 +109,7 @@ class SNRewardList(Thread):
             Column('amount', Float),
             Column('source', Integer),
             Column('meta', Integer),
+            Column('verified', Integer),
         )
 
     def start(self):
@@ -119,13 +133,12 @@ class SNRewardList(Thread):
 
         self.lock.release()
 
-        abusedSmart = 0
         self.currentHeight = 300000
 
         lastReward = self.getLastReward()
 
         if lastReward:
-            self.currentHeight = int(lastReward.block) + 1
+            self.currentHeight = lastReward.block + 1
 
         logger.info("Start block {}".format(self.currentHeight))
 
@@ -161,71 +174,107 @@ class SNRewardList(Thread):
                 time.sleep(10)
                 continue
 
-            self.currentHeight += 1
-
-            reward = self.getRewardForBlock(block)
-
-            if reward:
-
-                if self.addReward(reward):
-                    logger.debug("Added: {}".format(str(reward)))
-
-                if self.rewardCB:
-                    self.rewardCB(reward, self.isSynced())
-
-            else:
+            if not 'tx' in block:
 
                 reward = SNReward(block=block['height'],
                                            txtime=0,
                                            payee="error",
                                            source=0,
-                                           meta=-1)
-                if self.addReward(reward):
+                                           meta=-1,
+                                           verified=1)
 
+                if self.addReward(reward):
+                    logger.error("No transactions in block! {} - missing payout {}".format(reward.block,reward.amount))
+                    self.currentHeight += 1
+
+                    if self.errorCB:
+                        self.errorCB(SNRewardError(1, "No transactions " + str(reward)))
+
+                    continue
+
+            blockHeight = block['height']
+            expectedPayout = 5000.0  * ( 143500.0 / blockHeight ) * 0.1
+            expectedUpper = expectedPayout * 1.01
+            expectedLower = expectedPayout * 0.99
+
+            reward = None
+            error = False
+
+            # Search the new coin transaction of the block
+            for tx in block['tx']:
+
+                rawTx = self.rpc.getRawTransaction(tx)
+
+                if rawTx.error:
+                    error = True
+
+                    if self.errorCB:
+                        self.errorCB(SNRewardError(2, "getRawTransaction" + str(rawTx.error)))
+
+                    break
+
+                # We found the new coin transaction of the block
+                if len(rawTx['vin']) == 1 and 'coinbase' in rawTx['vin'][0]:
+
+                    for out in rawTx['vout']:
+
+                        amount = float(out['value'])
+
+                        if amount <= expectedUpper and amount >= expectedLower:
+                           #We found the node payout for this block!
+
+                           txtime = rawTx['time']
+                           payee = out['scriptPubKey']['addresses'][0]
+
+                           reward = SNReward(block=blockHeight,
+                                           txtime=txtime,
+                                           payee=payee,
+                                           amount=amount,
+                                           source=0,
+                                           meta=0,
+                                           verified=1)
+
+            if reward:
+
+                if self.addReward(reward):
+                    self.currentHeight += 1
+                    logger.debug("Added: {}".format(str(reward)))
+                else:
+                    if self.verifyReward(reward):
+                        self.currentHeight += 1
+                        logger.debug("Verified: {}".format(str(reward)))
+                    else:
+                        logger.warning("Could not verify reward - {}".format(str(reward)))
+
+                        if self.errorCB:
+                            self.errorCB(SNRewardError(-1, "Could not verify reward {}".format(str(reward))))
+
+                        time.sleep(300)
+
+                if self.rewardCB:
+                    self.rewardCB(reward, self.blockDistance())
+
+            elif not error:
+
+                if self.errorCB:
+                    self.errorCB(SNRewardError(3, "Could not find reward in transactions!"))
+
+                reward = SNReward(block=block['height'],
+                                           txtime=0,
+                                           payee="error",
+                                           source=0,
+                                           meta=-2,
+                                           verified=1)
+                if self.addReward(reward):
+                    self.currentHeight += 1
                     logger.error("Could not fetch reward! {} - missing payout {}".format(reward.block,reward.amount))
 
-    def isSynced(self):
-        return self.chainHeight and self.currentHeight >= ( self.chainHeight - 4 )
+            else:
+                time.sleep(60)
+                logger.debug("Unexpected error occured. Sleep a bit..")
 
-    def getRewardForBlock(self, block):
-
-        if not block or 'tx' not in block:
-            return None
-
-        blockHeight = block['height']
-        expectedPayout = 5000.0  * ( 143500.0 / blockHeight ) * 0.1
-        expectedUpper = expectedPayout * 1.01
-        expectedLower = expectedPayout * 0.99
-
-        # Search the new coin transaction of the block
-        for tx in block['tx']:
-
-            rawTx = self.rpc.getRawTransaction(tx)
-
-            if rawTx.error:
-                return None
-
-            # We found the new coin transaction of the block
-            if len(rawTx['vin']) == 1 and 'coinbase' in rawTx['vin'][0]:
-
-                for out in rawTx['vout']:
-
-                    amount = float(out['value'])
-
-                    if amount <= expectedUpper and amount >= expectedLower:
-                       #We found the node payout for this block!
-
-                       txtime = rawTx['time']
-                       payee = out['scriptPubKey']['addresses'][0]
-
-                       return SNReward(block=blockHeight,
-                                       txtime=txtime,
-                                       payee=payee,
-                                       amount=amount,
-                                       source=0,
-                                       meta=0)
-
-        return None
+    def blockDistance(self):
+        return self.chainHeight - self.currentHeight if self.chainHeight else sys.maxsize
 
     def execute(self, query):
 
@@ -247,16 +296,25 @@ class SNRewardList(Thread):
                                    payee=reward.payee,
                                    amount=reward.amount,
                                    source=reward.source,
-                                   meta=reward.meta)
+                                   meta=reward.meta,
+                                   verified=reward.verified)
 
             if self.execute(newReward):
                 return True
 
         except Exception as e:
-            logger.debug("addReward", exc_info=e)
+            #logger.debug("addReward", exc_info=e)
             self.lock.release()
 
         return False
+
+    def verifyReward(self, reward):
+
+        query = self.rewards.update()\
+                       .values(verified=1)\
+                       .where(self.rewards.c.block == reward.block)
+
+        return self.execute(query).rowcount
 
     def getNextReward(self, fromTime=None):
 
@@ -268,7 +326,7 @@ class SNRewardList(Thread):
 
     def getLastReward(self):
 
-        query = select([self.rewards]).order_by(self.rewards.c.block.desc()).limit(1)
+        query = select([self.rewards]).where(self.rewards.c.verified == 1).order_by(self.rewards.c.block.desc()).limit(1)
 
         lastReward = self.execute(query).fetchone()
 

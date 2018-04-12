@@ -33,12 +33,12 @@ if not input:
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger("rewardtest")
 
-def rewardCB(reward, isSynced):
+def rewardCB(reward, blockDistance):
     logger.info("rewardCB: {}".format(str(reward)))
 
 if __name__ == '__main__':
 
-    test = 2
+    test = 1
 
     directory = os.path.dirname(os.path.realpath(__file__))
 
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     while test == 1:
 
-        if rewardList.isSynced():
+        if rewardList.blockDistance() < 2:
 
             address = raw_input("Address to lookup: ")
 
