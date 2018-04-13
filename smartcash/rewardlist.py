@@ -34,6 +34,13 @@ from sqlalchemy import *
 
 logger = logging.getLogger("smartcash.rewardlist")
 
+def reward_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+
+    return SNReward(**d)
+
 class SNRewardError(object):
     def __init__(self, code, message):
         self.code = code
@@ -81,36 +88,22 @@ class SNReward(object):
 
 class SNRewardList(Thread):
 
-    def __init__(self, sessionPath, rpcConfig, rewardCB = None, errorCB = None):
+    def __init__(self, dbPath, rpcConfig, rewardCB = None, errorCB = None):
 
         Thread.__init__(self)
 
         self.running = False
         self.daemon = True
 
-        self.conn = None
         self.rewardCB = rewardCB
         self.errorCB = errorCB
         self.rpc = SmartCashRPC(rpcConfig)
-        self.sessionPath = sessionPath
 
         self.chainHeight = None
         self.currentHeight = None
         self.synced = False
 
-        self.lock = Lock()
-
-        self.metadata = MetaData()
-
-        self.rewards = Table('rewards', self.metadata,
-            Column('block', Integer, primary_key=True, autoincrement=False),
-            Column('txtime', Integer),
-            Column('payee', Text),
-            Column('amount', Float),
-            Column('source', Integer),
-            Column('meta', Integer),
-            Column('verified', Integer),
-        )
+        self.db = SNRewardDatabase(dbPath)
 
     def start(self):
 
@@ -122,16 +115,6 @@ class SNRewardList(Thread):
         self.running = False
 
     def run(self):
-
-        self.lock.acquire()
-
-        self.engine = create_engine(self.sessionPath, connect_args={'check_same_thread': False}, echo=False)
-
-        self.metadata.create_all(self.engine)
-
-        self.conn = self.engine.connect()
-
-        self.lock.release()
 
         self.currentHeight = 300000
 
@@ -276,137 +259,217 @@ class SNRewardList(Thread):
     def blockDistance(self):
         return self.chainHeight - self.currentHeight if self.chainHeight else sys.maxsize
 
-    def execute(self, query):
-
-        self.lock.acquire()
-
-        result = self.conn.execute(query)
-
-        self.lock.release()
-
-        return result
-
     def addReward(self, reward):
 
         try:
 
-            newReward = self.rewards.insert()\
-                           .values(block=reward.block,
-                                   txtime=int(reward.txtime),
-                                   payee=reward.payee,
-                                   amount=reward.amount,
-                                   source=reward.source,
-                                   meta=reward.meta,
-                                   verified=reward.verified)
+            with self.db.connection as db:
+                query = "INSERT INTO rewards(\
+                        block,\
+                        txtime,\
+                        payee,\
+                        amount,\
+                        source,\
+                        meta,\
+                        verified) \
+                        values( ?, ?, ?, ?, ?, ?, ? )"
 
-            if self.execute(newReward):
+                db.cursor.execute(query, (
+                                  reward.block,
+                                  reward.txtime,
+                                  reward.payee,
+                                  reward.amount,
+                                  reward.source,
+                                  reward.meta,
+                                  reward.verified))
+
                 return True
 
         except Exception as e:
-            #logger.debug("addReward", exc_info=e)
-            self.lock.release()
+            pass
+            #logger.info("addReward", exc_info=e)
 
         return False
 
+    def getLastReward(self):
+
+        lastReward = None
+
+        with self.db.connection as db:
+            db.cursor.row_factory = reward_factory
+            db.cursor.execute("SELECT * FROM rewards WHERE verified=1 ORDER BY block DESC LIMIT 1")
+            lastReward = db.cursor.fetchone()
+
+        return lastReward
+
+    def getRewardsForPayee(self, payee, fromTime = None):
+
+        payouts = None
+        query = "SELECT * FROM rewards WHERE payee=? "
+
+        if fromTime:
+            query += "AND txtime >= {}".format(int(fromTime))
+
+        with self.db.connection as db:
+            db.cursor.row_factory = reward_factory
+            db.cursor.execute(query,[payee])
+            payouts = db.cursor.fetchall()
+
+        return payouts
+
     def verifyReward(self, reward):
 
-        query = self.rewards.update()\
-                       .values(verified=1)\
-                       .where(self.rewards.c.block == reward.block)
+        updated = False
 
-        return self.execute(query).rowcount
+        query = "UPDATE rewards SET verified=1 WHERE block=?"
+
+        with self.db.connection as db:
+            logger.info("Q {} - block {}".format(query,reward.block))
+            db.cursor.execute(query,[reward.block]).rowcount
+            updated = db.cursor.rowcount
+            logger.info("ROW {}".format(updated))
+        return updated
 
     def getNextReward(self, fromTime=None):
 
-        query = select([self.rewards]).where(self.rewards.c.txtime >= int(fromTime)).limit(1)
+        nextReward = None
 
-        nextReward = self.execute(query).fetchone()
+        query = "SELECT * FROM rewards WHERE txtime>={} LIMIT 1".format(int(fromTime))
 
-        return nextReward if nextReward else None
+        with self.db.connection as db:
+            db.cursor.row_factory = reward_factory
+            db.cursor.execute(query)
+            nextReward = db.cursor.fetchone()
 
-    def getLastReward(self):
-
-        query = select([self.rewards]).where(self.rewards.c.verified == 1).order_by(self.rewards.c.block.desc()).limit(1)
-
-        lastReward = self.execute(query).fetchone()
-
-        return lastReward if lastReward else None
+        return nextReward
 
     def updateSource(self, reward):
 
-        query = self.rewards.update().\
-                    values(source=reward.source).\
-                    where(self.rewards.c.block == reward.block)
+        updated = False
 
-        updated = self.execute(query).rowcount
+        query = "UPDATE rewards SET source=? WHERE block=?"
 
-        if not updated:
-            updated = self.addReward(reward)
-            logger.info("updateSource not found, add {}".format(updated))
-        else:
-            logger.info("updateSource updated - {}".format(str(reward)))
+        with self.db.connection as db:
+            db.cursor.execute(query,(reward.source, reward.block))
+            updated = db.cursor.rowcount
 
         return updated
 
     def updateMeta(self, reward):
 
-        query = self.rewards.update().\
-                    values(meta=reward.meta).\
-                    where(self.rewards.c.block == reward.block)
+        updated = False
 
-        updated = self.execute(query).rowcount
+        query = "UPDATE rewards SET meta=? WHERE block=?"
 
-        if not updated:
-            updated = self.addReward(reward)
-            logger.info("updateMeta not found, add {}".format(updated))
-        else:
-            logger.info("updateMeta updated - {}".format(str(reward)))
+        with self.db.connection as db:
+            db.cursor.execute(query,(reward.meta, reward.block))
+            updated = db.cursor.rowcount
 
         return updated
 
-    def getRewardsForPayee(self, payee, fromTime = None):
-
-        query = select([self.rewards]).where(self.rewards.c.payee == payee)
-
-        if fromTime:
-            query = query.where(self.rewards.c.txtime >= int(fromTime))
-
-        rewards = self.execute(query).fetchall()
-
-        return rewards
-
     def getRewardCount(self, start = None, meta = None, source = None):
 
-        query = select([func.count(self.rewards.c.block)])
+        query = "SELECT count(*) as c FROM rewards "
 
         if start != None:
-            query = query.where(self.rewards.c.txtime >= int(start))
+            query += "WHERE txtime>={} ".format(int(start))
 
         if source != None:
-            query = query.where(self.rewards.c.source == source)
+            query += "{} source={} ".format("WHERE" if not "WHERE" in query else "AND", int(source))
 
         if meta != None:
-            query = query.where(self.rewards.c.meta == meta)
+            query += "{} meta={} ".format("WHERE" if not "WHERE" in query else "AND", int(meta))
 
-        rewards = self.execute(query).scalar()
+        logger.info("QUERY " + query)
 
-        return rewards
+        with self.db.connection as db:
+            db.cursor.execute(query)
+            rewards = db.cursor.fetchone()
+
+        logger.info("RESULT {}".format(rewards['c']))
+
+        return rewards['c']
 
     def getReward(self, block):
 
-        query = select([self.rewards]).where(self.rewards.c.block == block)
+        reward = None
 
-        rewards = self.execute(query).fetchone()
+        query = "SELECT * FROM rewards WHERE block=?"
 
-        return rewards
+        with self.db.connection as db:
+            db.cursor.row_factory = reward_factory
+            db.cursor.execute(query, [block])
+            reward = db.cursor.fetchone()
+
+        return reward
 
     def getRewards(self, payee, start = None):
 
-        query = select([self.rewards]).where(self.rewards.c.payee == payee)
+        rewards = []
+        query = "SELECT * FROM rewards WHERE payee='{}' ".format(payee)
 
         if start:
-            query = query.where(self.rewards.c.txtime >= int(start))
+            query += "AND txtime >= {}".format(int(start))
 
-        rewards = self.execute(query).fetchall()
+        with self.db.connection as db:
+            db.cursor.row_factory = reward_factory
+            db.cursor.execute(query)
+            rewards = db.cursor.fetchall()
 
         return rewards
+
+#####
+#
+# Wrapper for the node database where all the nodes from the
+# global nodelist are stored.
+#
+#####
+
+class SNRewardDatabase(object):
+
+    def __init__(self, dburi):
+
+        self.connection = ThreadedSQLite(dburi)
+
+        if self.isEmpty():
+            self.reset()
+
+    def isEmpty(self):
+
+        tables = []
+
+        with self.connection as db:
+
+            db.cursor.execute("SELECT name FROM sqlite_master")
+
+            tables = db.cursor.fetchall()
+
+        return len(tables) == 0
+
+    def raw(self, query):
+
+        result = None
+
+        with self.connection as db:
+            db.cursor.execute(query)
+            result = db.cursor.fetchall()
+
+        return result
+
+    def reset(self):
+
+        sql = '\
+        BEGIN TRANSACTION;\
+        CREATE TABLE "rewards" (\
+        	`block` INTEGER NOT NULL PRIMARY KEY,\
+        	`txtime` INTEGER,\
+        	`payee` TEXT,\
+            `amount` REAL,\
+            `source` INTEGER,\
+            `meta` INTEGER,\
+            `verified` INTEGER\
+        );\
+        COMMIT;'
+
+        with self.connection as db:
+            db.cursor.executescript(sql)

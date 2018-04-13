@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     rpcConfig = RPCConfig('someusername','somepassword')
 
-    rewardList = SNRewardList('sqlite:////' + directory + '/rewards.db', rpcConfig, rewardCB)
+    rewardList = SNRewardList(directory + '/rewards.db', rpcConfig, rewardCB)
 
     rewardList.start()
 
