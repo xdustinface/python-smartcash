@@ -421,7 +421,7 @@ class SNRewardList(Thread):
                 reward = db.cursor.fetchone()
 
         except Exception as e:
-            logger.error("getReward - " + query, exc_info=e)
+            logger.info("getReward - " + query, exc_info=e)
 
         return reward
 
@@ -441,7 +441,7 @@ class SNRewardList(Thread):
                 rewards = db.cursor.fetchall()
 
         except Exception as e:
-            logger.error("getRewards - " + query, exc_info=e)
+            logger.info("getRewards - " + query, exc_info=e)
 
         return rewards
 

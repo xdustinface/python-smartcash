@@ -111,8 +111,10 @@ class ThreadedSQLite(object):
         self.cursor = self.connection.cursor()
         return self
     def __exit__(self, type, value, traceback):
-        self.lock.release()
         self.connection.commit()
+
         if self.cursor is not None:
             self.cursor.close()
             self.cursor = None
+
+        self.lock.release()
