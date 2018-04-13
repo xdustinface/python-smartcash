@@ -59,6 +59,9 @@ class SNReward(object):
             if attribute in kwargs:
                  setattr(self, attribute, kwargs[attribute])
 
+        if not hasattr(self, 'block'):
+            raise Exception("SNReward - Missing block")
+
         if not self.block or self.block < 300000:
             self.block = 0
 
@@ -295,10 +298,15 @@ class SNRewardList(Thread):
 
         lastReward = None
 
-        with self.db.connection as db:
-            db.cursor.row_factory = reward_factory
-            db.cursor.execute("SELECT * FROM rewards WHERE verified=1 ORDER BY block DESC LIMIT 1")
-            lastReward = db.cursor.fetchone()
+        try:
+
+            with self.db.connection as db:
+                db.cursor.row_factory = reward_factory
+                db.cursor.execute("SELECT * FROM rewards WHERE verified=1 ORDER BY block DESC LIMIT 1")
+                lastReward = db.cursor.fetchone()
+
+        except Exception as e:
+            logger.error("getLastReward", exc_info=e)
 
         return lastReward
 
@@ -310,10 +318,15 @@ class SNRewardList(Thread):
         if fromTime:
             query += "AND txtime >= {}".format(int(fromTime))
 
-        with self.db.connection as db:
-            db.cursor.row_factory = reward_factory
-            db.cursor.execute(query,[payee])
-            payouts = db.cursor.fetchall()
+        try:
+
+            with self.db.connection as db:
+                db.cursor.row_factory = reward_factory
+                db.cursor.execute(query,[payee])
+                payouts = db.cursor.fetchall()
+
+        except Exception as e:
+            logger.error("getRewardsForPayee - " + query, exc_info=e)
 
         return payouts
 
@@ -336,10 +349,15 @@ class SNRewardList(Thread):
 
         query = "SELECT * FROM rewards WHERE txtime>={} LIMIT 1".format(int(fromTime))
 
-        with self.db.connection as db:
-            db.cursor.row_factory = reward_factory
-            db.cursor.execute(query)
-            nextReward = db.cursor.fetchone()
+        try:
+
+            with self.db.connection as db:
+                db.cursor.row_factory = reward_factory
+                db.cursor.execute(query)
+                nextReward = db.cursor.fetchone()
+
+        except Exception as e:
+            logger.error("getNextReward - " + query, exc_info=e)
 
         return nextReward
 
@@ -380,13 +398,11 @@ class SNRewardList(Thread):
         if meta != None:
             query += "{} meta={} ".format("WHERE" if not "WHERE" in query else "AND", int(meta))
 
-        logger.info("QUERY " + query)
-
         with self.db.connection as db:
+            logger.debug("getRewardCount " + query)
             db.cursor.execute(query)
             rewards = db.cursor.fetchone()
-
-        logger.info("RESULT {}".format(rewards['c']))
+            logger.debug("getRewardCount result {}".format(rewards['c']))
 
         return rewards['c']
 
@@ -394,12 +410,18 @@ class SNRewardList(Thread):
 
         reward = None
 
-        query = "SELECT * FROM rewards WHERE block=?"
+        query = "SELECT * FROM rewards WHERE block={}".format(block)
 
-        with self.db.connection as db:
-            db.cursor.row_factory = reward_factory
-            db.cursor.execute(query, [block])
-            reward = db.cursor.fetchone()
+        try:
+
+            with self.db.connection as db:
+                logger.debug("getReward " + query)
+                db.cursor.row_factory = reward_factory
+                db.cursor.execute(query)
+                reward = db.cursor.fetchone()
+
+        except Exception as e:
+            logger.error("getReward - " + query, exc_info=e)
 
         return reward
 
@@ -411,10 +433,15 @@ class SNRewardList(Thread):
         if start:
             query += "AND txtime >= {}".format(int(start))
 
-        with self.db.connection as db:
-            db.cursor.row_factory = reward_factory
-            db.cursor.execute(query)
-            rewards = db.cursor.fetchall()
+        try:
+
+            with self.db.connection as db:
+                db.cursor.row_factory = reward_factory
+                db.cursor.execute(query)
+                rewards = db.cursor.fetchall()
+
+        except Exception as e:
+            logger.error("getRewards - " + query, exc_info=e)
 
         return rewards
 
