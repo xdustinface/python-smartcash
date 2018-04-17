@@ -1,5 +1,5 @@
 #
-# Part of `libsmartcash`
+# Part of `python-smartcash`
 #
 # Copyright 2018 dustinface
 #

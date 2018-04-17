@@ -1,5 +1,5 @@
 #
-# Part of `libsmartcash`
+# Part of `python-smartcash`
 #
 # Simple class to create and maintain a database
 # with all paid SmartNode rewards.
@@ -337,10 +337,10 @@ class SNRewardList(Thread):
         query = "UPDATE rewards SET verified=1 WHERE block=?"
 
         with self.db.connection as db:
-            logger.info("Q {} - block {}".format(query,reward.block))
+
             db.cursor.execute(query,[reward.block]).rowcount
             updated = db.cursor.rowcount
-            logger.info("ROW {}".format(updated))
+
         return updated
 
     def getNextReward(self, fromTime=None):
@@ -399,10 +399,10 @@ class SNRewardList(Thread):
             query += "{} meta={} ".format("WHERE" if not "WHERE" in query else "AND", int(meta))
 
         with self.db.connection as db:
-            logger.debug("getRewardCount " + query)
+
             db.cursor.execute(query)
             rewards = db.cursor.fetchone()
-            logger.debug("getRewardCount result {}".format(rewards['c']))
+
 
         return rewards['c']
 
@@ -415,7 +415,7 @@ class SNRewardList(Thread):
         try:
 
             with self.db.connection as db:
-                logger.debug("getReward " + query)
+
                 db.cursor.row_factory = reward_factory
                 db.cursor.execute(query)
                 reward = db.cursor.fetchone()

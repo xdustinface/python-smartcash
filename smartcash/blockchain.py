@@ -1,5 +1,5 @@
 #####
-# Part of `libsmartcash`
+# Part of `python-smartcash`
 #
 # Class to maintain a database of the SmartCash blockchain.
 #  * Creates the database
