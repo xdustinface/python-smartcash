@@ -96,6 +96,7 @@ class SNRewardList(Thread):
         Thread.__init__(self)
 
         self.running = False
+        self.paused = False
         self.daemon = True
 
         self.rewardCB = rewardCB
@@ -117,6 +118,14 @@ class SNRewardList(Thread):
     def stop(self):
         self.running = False
 
+    def pause(self):
+        logger.info("pause")
+        self.paused = True
+
+    def resume(self):
+        logger.info("resume")
+        self.paused = False
+
     def run(self):
 
         self.currentHeight = 300000
@@ -133,6 +142,10 @@ class SNRewardList(Thread):
         self.running = True
 
         while self.running:
+
+            while self.paused:
+                logger.info("paused!")
+                time.sleep(5)
 
             if not lastInfoCheck or (time.time() - lastInfoCheck) > 50:
 
@@ -219,6 +232,9 @@ class SNRewardList(Thread):
                                            source=0,
                                            meta=0,
                                            verified=1)
+
+            if self.paused:
+                continue
 
             if reward:
 
