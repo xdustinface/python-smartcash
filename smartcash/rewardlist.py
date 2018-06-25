@@ -221,11 +221,11 @@ class SNRewardList(Thread):
 
                         if amount <= expectedUpper and amount >= expectedLower:
                            #We found the node payout for this block!
-
                            txtime = rawTx['time']
-                           payee = out['scriptPubKey']['addresses'][0]
+                           if 'addresses' in out['scriptPubKey']:
+                               payee = out['scriptPubKey']['addresses'][0]
 
-                           reward = SNReward(block=blockHeight,
+                               reward = SNReward(block=blockHeight,
                                            txtime=txtime,
                                            payee=payee,
                                            amount=amount,
