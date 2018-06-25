@@ -251,8 +251,8 @@ class SmartCashRPC(object):
                 response.data = None
                 response.error = RPCError(16,err)
                 logging.debug(err)
-            elif not 'IsMasternodeListSynced' in response.data:
-                err = 'getSyncStatus no IsMasternodeListSynced'
+            elif not 'IsSmartnodeListSynced' in response.data:
+                err = 'getSyncStatus no IsSmartnodeListSynced'
                 response.data = None
                 response.error = RPCError(16,err)
                 logging.debug(err)
