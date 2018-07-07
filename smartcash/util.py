@@ -24,6 +24,8 @@
 import threading
 import sqlite3 as sql
 
+HF_1_2_MULTINODE_PAYMENTS = 545005
+
 class ThreadedSQLite(object):
     def __init__(self, dburi):
         self.lock = threading.Lock()
@@ -42,3 +44,20 @@ class ThreadedSQLite(object):
             self.cursor = None
 
         self.lock.release()
+
+def getPayeesPerBlock(nHeight):
+
+    if nHeight >= HF_1_2_MULTINODE_PAYMENTS:
+        return 10
+
+    return 1
+
+def getPayoutInterval(nHeight):
+
+    if nHeight >= HF_1_2_MULTINODE_PAYMENTS:
+        return 2
+
+    return 1
+
+def getBlockReward(nHeight):
+    return 5000.0  * ( 143500.0 / nHeight ) * 0.1

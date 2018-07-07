@@ -27,8 +27,9 @@
 import os, sys
 from threading import Thread, Lock
 import time
+import json
 import logging
-from smartcash.util import ThreadedSQLite
+from smartcash.util import ThreadedSQLite, getBlockReward, getPayeesPerBlock, getPayoutInterval
 from smartcash.rpc import SmartCashRPC, RPCConfig
 from sqlalchemy import *
 
@@ -191,13 +192,36 @@ class SNRewardList(Thread):
 
                     continue
 
-            blockHeight = block['height']
-            expectedPayout = 5000.0  * ( 143500.0 / blockHeight ) * 0.1
+            nHeight = block['height']
+            payoutInterval = getPayoutInterval(nHeight)
+            nBlocksAdded = 0
+            blockReward = 0
+
+            while nBlocksAdded < payoutInterval:
+                blockReward += getBlockReward(nHeight - nBlocksAdded)
+                nBlocksAdded += 1
+
+            expectedPayees = getPayeesPerBlock(nHeight)
+            expectedPayout = blockReward / expectedPayees
             expectedUpper = expectedPayout * 1.01
             expectedLower = expectedPayout * 0.99
 
             reward = None
             error = False
+
+            # If the height is no node reward height.
+            if nHeight % payoutInterval:
+
+                reward = SNReward(block=nHeight,
+                                   txtime=0,
+                                   payee="NoRewardBlock",
+                                   source=0,
+                                   meta=-3,
+                                   verified=1)
+
+                if self.addReward(reward):
+                    self.currentHeight += 1
+                    continue
 
             # Search the new coin transaction of the block
             for tx in block['tx']:
@@ -212,6 +236,9 @@ class SNRewardList(Thread):
 
                     break
 
+                foundPayees = 0
+                payees = []
+
                 # We found the new coin transaction of the block
                 if len(rawTx['vin']) == 1 and 'coinbase' in rawTx['vin'][0]:
 
@@ -223,15 +250,21 @@ class SNRewardList(Thread):
                            #We found the node payout for this block!
                            txtime = rawTx['time']
                            if 'addresses' in out['scriptPubKey']:
-                               payee = out['scriptPubKey']['addresses'][0]
 
-                               reward = SNReward(block=blockHeight,
-                                           txtime=txtime,
-                                           payee=payee,
-                                           amount=amount,
-                                           source=0,
-                                           meta=0,
-                                           verified=1)
+                               payees.append(out['scriptPubKey']['addresses'][0])
+
+                               if len(payees) == expectedPayees:
+
+                                    reward = SNReward(block=nHeight,
+                                               txtime=txtime,
+                                               payee=json.dumps(payees),
+                                               amount=amount,
+                                               source=0,
+                                               meta=0,
+                                               verified=1)
+                                    break
+                if reward:
+                    break
 
             if self.paused:
                 continue
@@ -261,12 +294,12 @@ class SNRewardList(Thread):
                 if self.errorCB:
                     self.errorCB(SNRewardError(3, "Could not find reward in transactions!"))
 
-                reward = SNReward(block=block['height'],
-                                           txtime=0,
-                                           payee="error",
-                                           source=0,
-                                           meta=-2,
-                                           verified=1)
+                reward = SNReward(block=nHeight,
+                                   txtime=0,
+                                   payee="error",
+                                   source=0,
+                                   meta=-2,
+                                   verified=1)
                 if self.addReward(reward):
                     self.currentHeight += 1
                     logger.error("Could not fetch reward! {} - missing payout {}".format(reward.block,reward.amount))
@@ -329,7 +362,7 @@ class SNRewardList(Thread):
     def getRewardsForPayee(self, payee, fromTime = None):
 
         payouts = None
-        query = "SELECT * FROM rewards WHERE payee=? "
+        query = 'SELECT * FROM rewards WHERE payee like \"%{}%\" '.format(payee)
 
         if fromTime:
             query += "AND txtime >= {}".format(int(fromTime))
@@ -338,7 +371,7 @@ class SNRewardList(Thread):
 
             with self.db.connection as db:
                 db.cursor.row_factory = reward_factory
-                db.cursor.execute(query,[payee])
+                db.cursor.execute(query)
                 payouts = db.cursor.fetchall()
 
         except Exception as e:
