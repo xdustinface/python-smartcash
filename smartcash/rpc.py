@@ -40,6 +40,8 @@ except ImportError:
 
 logger = logging.getLogger("smartcash.rpc")
 
+_connection = None
+
 class RPCException(Exception):
     def __init__(self, code = None, message = None):
         super(RPCException, self).__init__()
@@ -96,9 +98,13 @@ class SmartCashRPC(object):
 
 
     def request(self, method, args = None):
+        global _connection
+        if _connection == None:
 
-        self.connection = http.HTTPConnection(self.config.url.hostname, self.config.port,
+            _connection = http.HTTPConnection(self.config.url.hostname, self.config.port,
                                              timeout=self.config.timeout)
+
+        self.connection = _connection
 
         post = json.dumps({'version': '1.1',
                                'method': method,
@@ -141,6 +147,7 @@ class SmartCashRPC(object):
 
             if not result:
                 raise RPCException(14,' RPC result missing')
+
 
         return result
 
