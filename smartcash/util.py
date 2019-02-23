@@ -25,6 +25,7 @@ import threading
 import sqlite3 as sql
 
 HF_1_2_MULTINODE_PAYMENTS = 545005
+HF_1_2_8_COLLATERAL_CHANGE = 910000
 
 class ThreadedSQLite(object):
     def __init__(self, dburi):
@@ -47,8 +48,10 @@ class ThreadedSQLite(object):
 
 def getPayeesPerBlock(nHeight):
 
-    if nHeight >= HF_1_2_MULTINODE_PAYMENTS:
+    if nHeight >= HF_1_2_MULTINODE_PAYMENTS and nHeight < HF_1_2_8_COLLATERAL_CHANGE:
         return 10
+    elif nHeight >= HF_1_2_8_COLLATERAL_CHANGE:
+        return 1
 
     return 1
 
