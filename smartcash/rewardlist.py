@@ -292,7 +292,7 @@ class SNRewardList(Thread):
             elif not error:
 
                 if self.errorCB:
-                    self.errorCB(SNRewardError(3, "Could not find reward in transactions!"))
+                    self.errorCB(SNRewardError(3, "Could not find reward in transactions! Height: {}".format(nHeight)))
 
                 reward = SNReward(block=nHeight,
                                    txtime=0,
